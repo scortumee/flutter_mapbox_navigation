@@ -35,6 +35,7 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
     var _animateBuildRoute = true
     var _longPressDestinationEnabled = true
     var _shouldReRoute = true
+    var _avoidHighway = false
     var navigationDirections: Directions?
 
     func startNavigation(arguments: NSDictionary?, result: @escaping FlutterResult)
@@ -66,6 +67,7 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
         for loc in locations
         {
             let location = Waypoint(coordinate: CLLocationCoordinate2D(latitude: loc.latitude!, longitude: loc.longitude!), name: loc.name)
+            location.separatesLegs = false
             _wayPoints.append(location)
         }
 
@@ -82,6 +84,8 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
         }
         _mapStyleUrlDay = arguments?["mapStyleUrlDay"] as? String
         _mapStyleUrlNight = arguments?["mapStyleUrlNight"] as? String
+
+        _avoidHighway = arguments?["avoidHighway"] as? Bool ?? _avoidHighway
         if(_wayPoints.count > 0)
         {
             if(IsMultipleUniqueRoutes)
@@ -124,6 +128,11 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
 
         options.distanceMeasurementSystem = _voiceUnits == "imperial" ? .imperial : .metric
         options.locale = Locale(identifier: _language)
+
+        if (_avoidHighway == true)
+        {
+            options.roadClassesToAvoid = .motorway
+        }
 
         Directions.shared.calculate(options) { [weak self](session, result) in
             guard let strongSelf = self else { return }
@@ -174,6 +183,9 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
             self._navigationViewController!.navigationMapView!.localizeLabels()
         }
         let flutterViewController = UIApplication.shared.delegate?.window??.rootViewController as! FlutterViewController
+        
+        self._navigationViewController!.routeLineTracksTraversal = true
+
         flutterViewController.present(self._navigationViewController!, animated: true, completion: nil)
     }
 

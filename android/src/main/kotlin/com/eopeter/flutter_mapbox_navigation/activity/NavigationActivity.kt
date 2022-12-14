@@ -15,6 +15,7 @@ import com.eopeter.flutter_mapbox_navigation.FlutterMapboxNavigationPlugin
 import com.eopeter.flutter_mapbox_navigation.models.MapBoxRouteProgressEvent
 import com.eopeter.flutter_mapbox_navigation.utilities.PluginUtilities
 import com.eopeter.flutter_mapbox_navigation.utilities.PluginUtilities.Companion.sendEvent
+import com.eopeter.flutter_mapbox_navigation.models.MapBoxEvents
 
 import com.mapbox.api.directions.v5.models.*
 
@@ -267,7 +268,7 @@ class NavigationActivity : AppCompatActivity() {
 
         // start the trip session to being receiving location updates in free drive
         // and later when a route is set also receiving route progress updates
-        mapboxNavigation.startTripSession()
+        // mapboxNavigation.startTripSession()
 
     }
 
@@ -281,20 +282,21 @@ class NavigationActivity : AppCompatActivity() {
         mapboxNavigation.registerVoiceInstructionsObserver(voiceInstructionsObserver)
         mapboxNavigation.registerRouteProgressObserver(replayProgressObserver)
 
-        if (mapboxNavigation.getRoutes().isEmpty()) {
-            // if simulation is enabled (ReplayLocationEngine set to NavigationOptions)
-            // but we're not simulating yet,
-            // push a single location sample to establish origin
-            mapboxReplayer.pushEvents(
-                listOf(
-                    ReplayRouteMapper.mapToUpdateLocation(
-                        eventTimestamp = 0.0,
-                        point = Point.fromLngLat(-122.39726512303575, 37.785128345296805)
-                    )
-                )
-            )
-            mapboxReplayer.playFirstLocation()
-        }
+        // if (mapboxNavigation.getRoutes().isEmpty()) {
+        //     // if simulation is enabled (ReplayLocationEngine set to NavigationOptions)
+        //     // but we're not simulating yet,
+        //     // push a single location sample to establish origin
+        //     mapboxReplayer.pushEvents(
+        //         listOf(
+        //             ReplayRouteMapper.mapToUpdateLocation(
+        //                 eventTimestamp = 0.0,
+        //                 point = Point.fromLngLat(-122.39726512303575, 37.785128345296805)
+        //             )
+        //         )
+        //     )
+        //     mapboxReplayer.playFirstLocation()
+        // }
+        getRoute()
     }
 
     override fun onStop() {
@@ -317,6 +319,64 @@ class NavigationActivity : AppCompatActivity() {
         routeLineView.cancel()
         speechApi.cancel()
         voiceInstructionsPlayer.shutdown()
+    }
+
+    private fun getRoute() {
+
+//        val originLocation = navigationLocationProvider.lastLocation
+//        val originPoint = originLocation?.let {
+//            Point.fromLngLat(it.longitude, it.latitude)
+//        } ?: return
+
+        if (!PluginUtilities.isNetworkAvailable(this)) {
+            PluginUtilities.sendEvent(MapBoxEvents.ROUTE_BUILD_FAILED, "No Internet Connection")
+            return
+        }
+
+        PluginUtilities.sendEvent(MapBoxEvents.ROUTE_BUILDING)
+
+        mapboxNavigation.requestRoutes(
+            RouteOptions.builder()
+                .applyDefaultNavigationOptions()
+                .applyLanguageAndVoiceUnitOptions(this)
+                .coordinatesList(points)
+                // provide the bearing for the origin of the request to ensure
+                // that the returned route faces in the direction of the current user movement
+                /*
+                .bearingsList(
+                    listOf(
+                        Bearing.builder()
+                            .angle(originLocation.bearing.toDouble())
+                            .degrees(45.0)
+                            .build(),
+                        null
+                    )
+                )
+                 */
+                .build()
+            , object : RouterCallback {
+
+                override fun onRoutesReady(routes: List<DirectionsRoute>,
+                                           routerOrigin: RouterOrigin) {
+
+                    mapboxNavigation.setRoutes(routes)
+
+                    mapboxNavigation.startTripSession()
+
+                }
+                override fun onFailure(reasons: List<RouterFailure>,
+                                       routeOptions: RouteOptions
+                ) {
+                    var message = "an error occurred while building the route. Errors: "
+                    for (reason in reasons){
+                        message += reason.message
+                    }
+                    PluginUtilities.sendEvent(MapBoxEvents.ROUTE_BUILD_FAILED, message)
+                }
+                override fun onCanceled(routeOptions: RouteOptions, routerOrigin: RouterOrigin) {
+                    PluginUtilities.sendEvent(MapBoxEvents.ROUTE_BUILD_CANCELLED)
+                }
+            })
     }
 
     private fun findRoute(destination: Point) {

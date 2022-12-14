@@ -77,6 +77,9 @@ class MapBoxOptions {
   /// No destination is required when set to true.
   final bool? enableFreeDriveMode;
 
+  /// should avoid highway
+  final bool? avoidHighway;
+
   MapBoxOptions(
       {this.initialLatitude,
       this.initialLongitude,
@@ -98,7 +101,8 @@ class MapBoxOptions {
       this.mapStyleUrlNight,
       this.enableFreeDriveMode,
       this.padding,
-      this.animateBuildRoute});
+      this.animateBuildRoute,
+      this.avoidHighway});
 
   Map<String, dynamic> toMap() {
     final Map<String, dynamic> optionsMap = new Map<String, dynamic>();
@@ -145,6 +149,8 @@ class MapBoxOptions {
       padding?.bottom,
       padding?.right,
     ]);
+
+    addIfNonNull("avoidHighway", avoidHighway);
 
     return optionsMap;
   }
